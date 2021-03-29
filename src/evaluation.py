@@ -34,11 +34,13 @@ logic (evaluate_policies), as well as auxiliary classes.
 """
 
 import time
+import pickle
 import numpy as np
 from src import utils, icp, population_icp
 import multiprocessing
 import sempler
 import os
+
 
 def gen_cases(n, P, k, w_min=1, w_max=1, var_min=1, var_max=1, int_min=0, int_max=0, random_state=None):
     """
@@ -61,13 +63,14 @@ def gen_cases(n, P, k, w_min=1, w_max=1, var_min=1, var_max=1, int_min=0, int_ma
             p = P
         W = sempler.dag_avg_deg(p, k, w_min, w_max)
         target = np.random.choice(range(p))
-        parents,_,_,mb = utils.graph_info(target, W)
-        if len(parents) > 0:# and len(parents) != len(mb):
+        parents, _, _, mb = utils.graph_info(target, W)
+        if len(parents) > 0:  # and len(parents) != len(mb):
             sem = sempler.LGANM(W, (var_min, var_max), (int_min, int_max))
             (truth, _, _, _) = utils.graph_info(target, W)
             cases.append(TestCase(i, sem, target, truth))
             i += 1
     return cases
+
 
 def process_results(unprocessed, P, R, G):
     """Process the results returned by the worker pool, sorting them by
@@ -87,6 +90,7 @@ def process_results(unprocessed, P, R, G):
         results.append(policy_results)
     return results
 
+
 def evaluate_policies(cases, policies, policy_names, runs, params, n_workers=None, batch_size=round(1e4), debug=False):
     """Evaluate the given policies over the given cases (SCMs) over runs
     with different random seeds, using as many cores as possible"""
@@ -95,13 +99,14 @@ def evaluate_policies(cases, policies, policy_names, runs, params, n_workers=Non
     print("Compiling experiment batch...", end="")
     experiments = []
     for i, policy in enumerate(policies):
-        for run in range(runs):
-            for case in cases:
+        for c, case in enumerate(cases):
+            for run in range(runs):
+                r_state = c * runs + run
                 experiment = ExperimentSettings(
-                    case = case,
-                    policy = policy,
-                    policy_name = policy_names[i],
-                    random_state = np.random.randint(999999),
+                    case=case,
+                    policy=policy,
+                    policy_name=policy_names[i],
+                    random_state=r_state,
                     **params)
                 experiments.append(experiment)
     print("  done (%0.2f seconds)" % (time.time() - start))
@@ -111,9 +116,12 @@ def evaluate_policies(cases, policies, policy_names, runs, params, n_workers=Non
     if n_workers is None:
         n_workers = os.cpu_count() - 1
     print("Available cores: %d" % os.cpu_count())
-    print("Running a total of %d experiments with %d workers in batches of size %d" % (n_exp, n_workers, batch_size))
-    setting = "Population" if params['population'] else ("Finite (%d samples/environment and %s obs. samples)" % (params['n_int'], params['n_obs']))
-    print("%s setting with a maximum of %d iterations per experiment" % (setting, params['max_iter']))
+    print("Running a total of %d experiments with %d workers in batches of size %d" % (
+        n_exp, n_workers, batch_size))
+    setting = "Population" if params['population'] else (
+        "Finite (%d samples/environment and %s obs. samples)" % (params['n_int'], params['n_obs']))
+    print("%s setting with a maximum of %d iterations per experiment" %
+          (setting, params['max_iter']))
     pool = multiprocessing.Pool(n_workers)
     n_batches = int(np.floor(n_exp / batch_size) + (n_exp % batch_size != 0))
     result = []
@@ -128,30 +136,34 @@ def evaluate_policies(cases, policies, policy_names, runs, params, n_workers=Non
         else:
             result += list(map(run_policy, batch))
         batch_end = time.time()
-        print("  %d/%d experiments completed (%0.2f seconds)" % ((i+1)*batch_size, n_exp, batch_end-batch_start))
+        print("  %d/%d experiments completed (%0.2f seconds)" %
+              ((i+1)*batch_size, n_exp, batch_end-batch_start))
+
     # Process the results into a more friendly format which can then
     # be used by the notebooks for plotting
     return process_results(result, len(policies), runs, len(cases))
+
 
 def run_policy(settings):
     """Execute a policy over a given test case, returning a returning a
     PolicyEvaluationResults object containing the result"""
 
     print(vars(settings))
-    
+
     # Initialization
     case = settings.case
     if settings.random_state is not None:
         np.random.seed(settings.random_state)
-    history = [] # where we store the ICP estimate / next intervention
+    history = []  # where we store the ICP estimate / next intervention
     # Initialize policy and generate observational sample
     if settings.population:
         policy = settings.policy(case.target, case.sem.p, settings.policy_name)
-        e = case.sem.sample(population = True)
+        e = case.sem.sample(population=True)
         envs = [e]
     else:
-        policy = settings.policy(case.target, case.sem.p, settings.policy_name, settings.alpha)
-        e = case.sem.sample(n = settings.n_obs)
+        policy = settings.policy(
+            case.target, case.sem.p, settings.policy_name, settings.alpha)
+        e = case.sem.sample(n=settings.n_obs)
         envs = Environments(case.sem.p, e)
     start = time.time()
 
@@ -162,42 +174,66 @@ def run_policy(settings):
     no_accepted = int(2**(case.sem.p-1))
     ratios = np.ones(case.sem.p) * 0.5
     ratios[case.target] = 0
-    selection = 'all' # on the first iteration, evaluate all possible candidate sets
-    empty_pool = [] # To log iterations in which the policy runs out of interventions
-    
+    selection = 'all'  # on the first iteration, evaluate all possible candidate sets
+    empty_pool = []  # To log iterations in which the policy runs out of interventions
+
     # Remaining iterations
     for i in range(settings.max_iter):
+    # for i in range(8):
         assert next_intervention != case.target
         # Build interventions: targets, parameters and type
         if next_intervention is None:
             empty_pool.append(i)
-            next_intervention = np.random.choice(utils.all_but(case.target, case.sem.p))
+            next_intervention = np.random.choice(
+                utils.all_but(case.target, case.sem.p))
             policy.interventions.append(next_intervention)
-        targets = intervention_targets(next_intervention, case.target, case.sem.p, settings.off_targets)
-        interventions_params = dict((t, (settings.intervention_mean, settings.intervention_var)) for t in targets)
-        interventions = {settings.intervention_type + '_interventions': interventions_params}
+        targets = intervention_targets(
+            next_intervention, case.target, case.sem.p, settings.off_targets)
+        interventions_params = dict(
+            (t, (settings.intervention_mean, settings.intervention_var)) for t in targets)
+        interventions = {settings.intervention_type +
+                         '_interventions': interventions_params}
         # Perform interventions and run ICP on new environment
-        history.append((current_estimate, targets, len(selection), no_accepted, ratios))
-        print(" (case_id: %s, target: %d, truth: %s, policy: %s) %d current estimate: %s accepted sets: %d next intervention: %s" % (case.id, case.target, case.truth, policy.name, i, current_estimate, no_accepted, targets)) if settings.debug else None
+        history.append((current_estimate, targets,
+                        len(selection), no_accepted, ratios))
+        # print(" (case_id: %s, target: %d, truth: %s, policy: %s) %d current estimate: %s accepted sets: %d next intervention: %s" % (case.id, case.target, case.truth, policy.name, i, current_estimate, no_accepted, targets))
+        # if settings.debug else None
         if settings.population:
-            new_env = case.sem.sample(population = True, **interventions)
+            new_env = case.sem.sample(population=True, **interventions)
             envs.append(new_env)
-            result = population_icp.population_icp(envs, case.target, selection=selection, debug=False)
+            result = population_icp.population_icp(
+                envs, case.target, selection=selection, debug=False)
         else:
-            new_env = case.sem.sample(n = settings.n_int, **interventions)
+            new_env = case.sem.sample(n=settings.n_int, **interventions)
             envs.add(next_intervention, new_env)
-            result = icp.icp(envs.to_list(), case.target, selection=selection, alpha=settings.alpha, debug=False)
+            result = icp.icp(envs.to_list(), case.target,
+                             selection=selection, alpha=settings.alpha, debug=False)
         # Pick next intervention
         next_intervention = policy.next(result, new_env)
         current_estimate = result.estimate
         no_accepted = len(result.accepted)
         selection = result.accepted if settings.speedup else 'all'
         ratios = utils.ratios(case.sem.p, result.accepted)
+
+    if settings.pkl_dir is not None:
+        pkl_dict = vars(settings).copy()
+        if settings.population:
+            pkl_dict['envs'] = envs
+        else:
+            pkl_dict['envs'] = envs.to_list()
+        pkl_dict['target'] = case.target
+        pkl_dict['truth'] = case.truth
+        pkl_nm = settings.pkl_dir / '{}.pickle'.format(settings.random_state)
+        with open(str(pkl_nm), 'wb') as pl:
+            pickle.dump(pkl_dict, pl)
+
     # Return result
     end = time.time()
     elapsed = end - start
-    print("  (case_id: %s) done (%0.2f seconds)" % (case.id, elapsed)) if settings.debug else None
+    print("  (case_id: %s) done (%0.2f seconds)" %
+          (case.id, elapsed)) if settings.debug else None
     return EvaluationResult(policy.name, current_estimate, history, empty_pool)
+
 
 def intervention_targets(target, response, p, max_off_targets):
     """Return intervention targets. If no off target effects are allowed
@@ -218,20 +254,23 @@ def intervention_targets(target, response, p, max_off_targets):
 # --------------------------------------------------------------------
 # Class definitions
 
+
 class TestCase():
     """Object that represents a test case
     ie. SCM + target + expected result
     """
+
     def __init__(self, id, sem, target, truth):
         self.id = id
         self.sem = sem
         self.target = target
         self.truth = truth
 
+
 class ExperimentSettings():
     """Contains the parameters for a single experiment
     ie. one run of one policy over one test case (SCM)"""
-    
+
     def __init__(self,
                  case,
                  policy,
@@ -245,10 +284,11 @@ class ExperimentSettings():
                  off_targets,
                  speedup,
                  random_state,
-                 n_int = None,
-                 n_obs = None,
-                 alpha = None):
-                
+                 n_int=None,
+                 n_obs=None,
+                 alpha=None,
+                 pkl_dir=None):
+
         # Build object
         self.case = case
         self.policy = policy
@@ -262,7 +302,8 @@ class ExperimentSettings():
         self.off_targets = off_targets
         self.speedup = speedup
         self.random_state = random_state
-        
+        self.pkl_dir = pkl_dir
+
         if not population:
             if n_int is not None and n_obs is not None and alpha is not None:
                 self.n_int = n_int
@@ -271,6 +312,7 @@ class ExperimentSettings():
             else:
                 raise Exception("Missing parameters for finite sample setting")
 
+
 class EvaluationResult():
     """Class to contain all information resulting from evaluating a policy
     over a test case"""
@@ -278,9 +320,9 @@ class EvaluationResult():
     def __init__(self, policy, estimate, history, empty_pool):
         self.policy = policy
         # Info
-        self.estimate = estimate # estimate produced by the policy
-        self.history = history # interventions and intermediate results of the policy
-        self.empty_pool = empty_pool # If the policy ran out of possible interventions
+        self.estimate = estimate  # estimate produced by the policy
+        self.history = history  # interventions and intermediate results of the policy
+        self.empty_pool = empty_pool  # If the policy ran out of possible interventions
 
     #(current_estimate, targets, len(selection), no_accepted, ratios)
 
@@ -295,21 +337,23 @@ class EvaluationResult():
     def len_selection(self):
         """Return the number of sets passed to the next iteration, across iterations"""
         return [step[2] for step in self.history]
-    
+
     def no_accepted(self):
         """Returns the number of accepted sets accross iterations"""
         return [step[3] for step in self.history]
-    
+
     def ratios(self):
         """Return the progression of ratios across iterations"""
         ratios = [step[4] for step in self.history]
         return np.array(ratios)
-            
+
+
 class Environments():
     """Class to hold samples from different environments, merging if they
     arise from the same intervention to improve efficiency"""
+
     def __init__(self, p, e):
-        self.envs = dict([(i,[]) for i in range(p)])
+        self.envs = dict([(i, []) for i in range(p)])
         self.envs[None] = e
 
     def add(self, target, env):

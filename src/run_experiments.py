@@ -38,6 +38,7 @@ employed by ABCD, so the method can run on the same test cases.
 
 import pickle
 import time
+from pathlib import Path
 from datetime import datetime
 from src import evaluation, policy, utils
 import argparse
@@ -45,11 +46,12 @@ import os
 import numpy as np
 import sempler
 
+
 def parameter_string(args, excluded_keys):
     """Convert a Namespace object (from argparse) into a string, excluding
     some keys, to use as filename or dataset name"""
     string = ""
-    for k,v in vars(args).items():
+    for k, v in vars(args).items():
         value = str(v)
         value = value.replace('/', '')
         if k not in excluded_keys:
@@ -59,6 +61,7 @@ def parameter_string(args, excluded_keys):
 # --------------------------------------------------------------------
 # Parse input parameters
 
+
 # Definitions and default settings
 arguments = {
     'n_workers': {'default': 1, 'type': int},
@@ -66,11 +69,12 @@ arguments = {
     'runs': {'default': 1, 'type': int},
     'max_iter': {'default': -1, 'type': int},
     'random_state': {'default': 42, 'type': int},
-    'tag' : {'type': str},
+    'tag': {'type': str},
     'debug': {'default': False, 'type': bool},
     'save_dataset': {'type': str},
     'load_dataset': {'type': str},
-    'abcd': {'type': bool, 'default': False}, # ABCD settings: Run only random, e + r, markov + e + r
+    # ABCD settings: Run only random, e + r, markov + e + r
+    'abcd': {'type': bool, 'default': False},
     'G': {'default': 4, 'type': int},
     'k': {'default': 3, 'type': float},
     'p_min': {'default': 8, 'type': int},
@@ -96,7 +100,7 @@ arguments = {
 # Parse settings from input
 parser = argparse.ArgumentParser(description='Run experiments')
 for name, params in arguments.items():
-    if params['type']==bool:
+    if params['type'] == bool:
         options = {'action': 'store_true'}
     else:
         options = {'action': 'store', 'type': params['type']}
@@ -110,14 +114,14 @@ for name, params in arguments.items():
 args = parser.parse_args()
 
 # Parameters that will be excluded from the filename (see parameter_string function above)
-excluded_keys = ['save_dataset', 'debug', 'n_workers', 'batch_size'] 
+excluded_keys = ['save_dataset', 'debug', 'n_workers', 'batch_size']
 excluded_keys += ['tag'] if args.tag is None else []
 excluded_keys += ['n_obs'] if args.n_obs is None else []
 excluded_keys += ['abcd'] if not args.abcd else []
 excluded_keys += ['ot'] if args.ot == 0 else []
 excluded_keys += ['nsp'] if not args.nsp else []
 
-print(args) # For debugging
+print(args)  # For debugging
 
 # Set random seed
 np.random.seed(args.random_state)
@@ -130,16 +134,21 @@ if args.load_dataset is not None:
     print("\nLoading test cases from %s" % args.load_dataset)
     # Load a dataset stored in the format used by ABCD
     G = len(os.listdir(os.path.join(args.load_dataset, 'dags')))
-    Ws = [np.loadtxt(os.path.join(args.load_dataset, 'dags', 'dag%d' % i, 'adjacency.txt')) for i in range(G)]
-    means = [np.loadtxt(os.path.join(args.load_dataset, 'dags', 'dag%d' % i, 'means.txt')) for i in range(G)]
-    variances = [np.loadtxt(os.path.join(args.load_dataset, 'dags', 'dag%d' % i, 'variances.txt')) for i in range(G)]
-    targets = [int(np.loadtxt(os.path.join(args.load_dataset, 'dags', 'dag%d' % i, 'target.txt'))) for i in range(G)]
+    Ws = [np.loadtxt(os.path.join(args.load_dataset, 'dags',
+                                  'dag%d' % i, 'adjacency.txt')) for i in range(G)]
+    means = [np.loadtxt(os.path.join(args.load_dataset,
+                                     'dags', 'dag%d' % i, 'means.txt')) for i in range(G)]
+    variances = [np.loadtxt(os.path.join(
+        args.load_dataset, 'dags', 'dag%d' % i, 'variances.txt')) for i in range(G)]
+    targets = [int(np.loadtxt(os.path.join(args.load_dataset,
+                                           'dags', 'dag%d' % i, 'target.txt'))) for i in range(G)]
     cases = []
     for i, W in enumerate(Ws):
         sem = sempler.LGANM(W, variances[i], means[i])
         truth = utils.graph_info(targets[i], W)[0]
         cases.append(evaluation.TestCase(i, sem, targets[i], truth))
-    excluded_keys += ['k', 'w_min', 'w_max', 'var_min', 'var_max', 'int_min', 'int_max', 'random_state', 'p_min', 'p_max']
+    excluded_keys += ['k', 'w_min', 'w_max', 'var_min', 'var_max',
+                      'int_min', 'int_max', 'random_state', 'p_min', 'p_max']
 # Or generate dataset
 else:
     P = args.p_min if args.p_min == args.p_max else (args.p_min, args.p_max)
@@ -178,20 +187,25 @@ if args.save_dataset is not None and args.load_dataset is None:
     dir_name = args.save_dataset + "_%d" % time.time() + parameter_string(args, exclude)
     print("\nSaving test cases under %s/" % dir_name)
     # Save weighted adjacency matrix, means, variances and target
-    for i,case in enumerate(cases):
+    for i, case in enumerate(cases):
         sem = case.sem
         os.makedirs(os.path.join(dir_name, 'dags', 'dag%d' % i), exist_ok=True)
-        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' % i, 'adjacency.txt'), sem.W)
-        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' % i, 'means.txt'), sem.means)
-        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' % i, 'variances.txt'), sem.variances)
-        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' % i, 'target.txt'), [case.target])    
+        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' %
+                                i, 'adjacency.txt'), sem.W)
+        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' %
+                                i, 'means.txt'), sem.means)
+        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' %
+                                i, 'variances.txt'), sem.variances)
+        np.savetxt(os.path.join(dir_name, 'dags', 'dag%d' %
+                                i, 'target.txt'), [case.target])
 else:
 
     # --------------------------------------------------------------------
     # Run experiments
 
     start = time.time()
-    print("\n\nBeginning experiments on %d graphs at %s\n\n" % (len(cases), datetime.now()))
+    print("\n\nBeginning experiments on %d graphs at %s\n\n" %
+          (len(cases), datetime.now()))
 
     population = not args.finite
 
@@ -199,31 +213,53 @@ else:
     if population:
         # Note that in the population setting the empty-set strategy does
         # nothing, as variables are only intervened on once
-        policies = [policy.PopRandom, policy.PopMarkov, policy.PopMarkovR] 
-        names = ["random", "markov", "markov + r"]
+        # policies = [policy.PopRandom, policy.PopMarkov, policy.PopMarkovR]
+        # names = ["random", "markov", "markov + r"]
+        policies = [policy.PopMarkovR]
+        names = ['markov + r']
         excluded_keys += ['n', 'n_obs', 'alpha']
     elif args.abcd:
-        policies = [policy.Random,
-                    policy.ER,
-                    policy.E,
-                    policy.R]
-        names = ["random", "e + r", "e", "r"]
+        # policies = [policy.Random,
+        #             policy.ER,
+        #             policy.E,
+        #             policy.R]
+        # names = ["random", "e + r", "e", "r"]
+        policies = [policy.E]
+        names = ['e']
     else:
-        policies = [policy.Random,
-                    policy.E,
-                    policy.R,
-                    policy.ER,
-                    policy.Markov,
-                    policy.MarkovE,
-                    policy.MarkovR,
-                    policy.MarkovER]
-        names = ["random", "e", "r", "e + r", "markov", "markov + e", "markov + r", "markov + e + r"]
+        # policies = [policy.Random,
+        #             policy.E,
+        #             policy.R,
+        #             policy.ER,
+        #             policy.Markov,
+        #             policy.MarkovE,
+        #             policy.MarkovR,
+        #             policy.MarkovER]
+        # names = ["random", "e", "r", "e + r", "markov", "markov + e", "markov + r", "markov + e + r"]
+        policies = [policy.E]
+        names = ['e']
 
     # Compose experimental parameters
     if args.max_iter == -1:
         max_iter = args.p_max
     else:
         max_iter = args.max_iter
+
+    res_dir = Path('/home/histopath/Data/AICP') / args.tag
+    if args.tag == 'abcd':
+        pkl_tag = 'n_obs_{}'.format(args.n_obs)
+    elif args.tag == 'fin':
+        pkl_tag = 'n_{}'.format(args.n)
+    elif args.tag == 'int_srt':
+        pkl_tag = 'i_mean_{}_alpha_{}'.format(
+            int(args.i_mean), int(args.alpha * 1e4))
+    elif args.tag == 'pop':
+        pkl_tag = 'random_state_{}'.format(args.random_state)
+    else:
+        raise NotImplementedError(
+            'the exp {} is not implemented'.format(args.tag))
+    pkl_dir = res_dir / pkl_tag
+    pkl_dir.mkdir(parents=True, exist_ok=True)
 
     evaluation_params = {'population': population,
                          'debug': args.debug,
@@ -235,21 +271,22 @@ else:
                          'speedup': not args.nsp,
                          'n_int': args.n,
                          'n_obs': args.n if args.n_obs is None else args.n_obs,
-                         'alpha': args.alpha}
+                         'alpha': args.alpha,
+                         'pkl_dir': pkl_dir}
 
     n_workers = None if args.n_workers == -1 else args.n_workers
 
-    results = evaluation.evaluate_policies(cases, policies, names, args.runs, evaluation_params, n_workers, args.batch_size)
+    results = evaluation.evaluate_policies(
+        cases, policies, names, args.runs, evaluation_params, n_workers, args.batch_size)
     end = time.time()
-    print("\n\nFinished experiments at %s (elapsed %0.2f seconds)" % (datetime.now(), end-start))
+    print("\n\nFinished experiments at %s (elapsed %0.2f seconds)" %
+          (datetime.now(), end-start))
 
     # --------------------------------------------------------------------
     # Save results
 
     # Compose filename
-    filename = "experiments/results_%d" % end
-    filename = filename + parameter_string(args, excluded_keys) + ".pickle"
-
+    filename = Path('experiments') / '{}.pickle'.format(pkl_tag)
     # Pickle results
-    pickle.dump([cases] + results, open(filename, "wb"))
-    print("Saved to file \"%s\"" % filename)
+    pickle.dump([cases] + results, open(str(filename), "wb"))
+    print('Save to file {}'.format(str(filename)))
