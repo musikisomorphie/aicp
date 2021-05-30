@@ -42,7 +42,7 @@ import sempler
 import os
 
 
-def gen_cases(n, P, k, w_min=1, w_max=1, var_min=1, var_max=1, int_min=0, int_max=0, random_state=None):
+def gen_cases(n, P, k, w_min=1, w_max=1, var_min=1, var_max=1, int_min=0, int_max=0, random_state=None, hidden=0):
     """
     Generate random experimental cases (ie. linear SEMs). Parameters:
       - n: total number of cases
@@ -64,10 +64,16 @@ def gen_cases(n, P, k, w_min=1, w_max=1, var_min=1, var_max=1, int_min=0, int_ma
         W = sempler.dag_avg_deg(p, k, w_min, w_max)
         target = np.random.choice(range(p))
         parents, _, _, mb = utils.graph_info(target, W)
-        if len(parents) > 0:  # and len(parents) != len(mb):
-            sem = sempler.LGANM(W, (var_min, var_max), (int_min, int_max))
-            (truth, _, _, _) = utils.graph_info(target, W)
-            cases.append(TestCase(i, sem, target, truth))
+        if len(parents) > hidden:  # and len(parents) != len(mb):
+            print('hidden', hidden, 'parents', parents)
+            sem = sempler.LGANM(W,
+                                (var_min, var_max),
+                                (int_min, int_max),
+                                hidden,
+                                parents,
+                                target)
+            # (truth, _, _, _) = utils.graph_info(target, W)
+            cases.append(TestCase(i, sem, target, parents))
             i += 1
     return cases
 
@@ -179,6 +185,7 @@ def run_policy(settings):
 
     # Remaining iterations
     for i in range(settings.max_iter):
+        print(i)
     # for i in range(8):
         assert next_intervention != case.target
         # Build interventions: targets, parameters and type

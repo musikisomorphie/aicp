@@ -93,7 +93,8 @@ arguments = {
     'n': {'default': 100, 'type': int},
     'n_obs': {'type': int},
     'alpha': {'default': 0.001, 'type': float},
-    'nsp': {'type': bool, 'default': False}
+    'nsp': {'type': bool, 'default': False},
+    'hidden': {'default': 0, 'type': int}
 }
 
 
@@ -121,7 +122,7 @@ excluded_keys += ['abcd'] if not args.abcd else []
 excluded_keys += ['ot'] if args.ot == 0 else []
 excluded_keys += ['nsp'] if not args.nsp else []
 
-print(args)  # For debugging
+print('args', args.hidden)  # For debugging
 
 # Set random seed
 np.random.seed(args.random_state)
@@ -130,38 +131,44 @@ np.random.seed(args.random_state)
 # Generate (or load) test cases
 
 # Load dataset
-if args.load_dataset is not None:
-    print("\nLoading test cases from %s" % args.load_dataset)
-    # Load a dataset stored in the format used by ABCD
-    G = len(os.listdir(os.path.join(args.load_dataset, 'dags')))
-    Ws = [np.loadtxt(os.path.join(args.load_dataset, 'dags',
-                                  'dag%d' % i, 'adjacency.txt')) for i in range(G)]
-    means = [np.loadtxt(os.path.join(args.load_dataset,
-                                     'dags', 'dag%d' % i, 'means.txt')) for i in range(G)]
-    variances = [np.loadtxt(os.path.join(
-        args.load_dataset, 'dags', 'dag%d' % i, 'variances.txt')) for i in range(G)]
-    targets = [int(np.loadtxt(os.path.join(args.load_dataset,
-                                           'dags', 'dag%d' % i, 'target.txt'))) for i in range(G)]
-    cases = []
-    for i, W in enumerate(Ws):
-        sem = sempler.LGANM(W, variances[i], means[i])
-        truth = utils.graph_info(targets[i], W)[0]
-        cases.append(evaluation.TestCase(i, sem, targets[i], truth))
-    excluded_keys += ['k', 'w_min', 'w_max', 'var_min', 'var_max',
-                      'int_min', 'int_max', 'random_state', 'p_min', 'p_max']
+# if args.load_dataset is not None:
+#     print("\nLoading test cases from %s" % args.load_dataset)
+#     # Load a dataset stored in the format used by ABCD
+#     G = len(os.listdir(os.path.join(args.load_dataset, 'dags')))
+#     Ws = [np.loadtxt(os.path.join(args.load_dataset, 'dags',
+#                                   'dag%d' % i, 'adjacency.txt')) for i in range(G)]
+#     means = [np.loadtxt(os.path.join(args.load_dataset,
+#                                      'dags', 'dag%d' % i, 'means.txt')) for i in range(G)]
+#     variances = [np.loadtxt(os.path.join(
+#         args.load_dataset, 'dags', 'dag%d' % i, 'variances.txt')) for i in range(G)]
+#     targets = [int(np.loadtxt(os.path.join(args.load_dataset,
+#                                            'dags', 'dag%d' % i, 'target.txt'))) for i in range(G)]
+#     cases = []
+#     for i, W in enumerate(Ws):
+#         truth = utils.graph_info(targets[i], W)[0]
+#         sem = sempler.LGANM(W,
+#                             variances[i],
+#                             means[i],
+#                             args.hidden,
+#                             truth,
+#                             targets[i])
+#         cases.append(evaluation.TestCase(i, sem, targets[i], truth))
+#     excluded_keys += ['k', 'w_min', 'w_max', 'var_min', 'var_max',
+#                       'int_min', 'int_max', 'random_state', 'p_min', 'p_max']
 # Or generate dataset
-else:
-    P = args.p_min if args.p_min == args.p_max else (args.p_min, args.p_max)
-    cases = evaluation.gen_cases(args.G,
-                                 P,
-                                 args.k,
-                                 args.w_min,
-                                 args.w_max,
-                                 args.var_min,
-                                 args.var_max,
-                                 args.int_min,
-                                 args.int_max)
-    excluded_keys += ['load_dataset']
+# else:
+P = args.p_min if args.p_min == args.p_max else (args.p_min, args.p_max)
+cases = evaluation.gen_cases(args.G,
+                             P,
+                             args.k,
+                             args.w_min,
+                             args.w_max,
+                             args.var_min,
+                             args.var_max,
+                             args.int_min,
+                             args.int_max,
+                             hidden=args.hidden)
+excluded_keys += ['load_dataset']
 
 # (Optionally) Save dataset according to format used by ABCD
 if args.save_dataset is not None and args.load_dataset is None:
@@ -245,7 +252,9 @@ else:
     else:
         max_iter = args.max_iter
 
-    res_dir = Path('/home/histopath/Data/AICP') / args.tag
+    res_dir = Path(
+        '/mnt/sda1/Data/LGANM_hidden_{}'.format(args.hidden)) / args.tag
+    print('n_obs', args.n_obs)
     if args.tag == 'abcd':
         pkl_tag = 'n_obs_{}'.format(args.n_obs)
     elif args.tag == 'fin':
@@ -286,7 +295,8 @@ else:
     # Save results
 
     # Compose filename
-    filename = Path('experiments') / '{}.pickle'.format(pkl_tag)
+    (res_dir / 'experiments').mkdir(parents=True, exist_ok=True)
+    filename = res_dir / 'experiments' / '{}.pickle'.format(pkl_tag)
     # Pickle results
     pickle.dump([cases] + results, open(str(filename), "wb"))
     print('Save to file {}'.format(str(filename)))

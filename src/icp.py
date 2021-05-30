@@ -118,8 +118,8 @@ def test_hypothesis(coefs, data, debug=False):
         # residuals_others = residuals[data.idx != i]
         mean_pvalues[i] = t_test(residuals_env, residuals_others)
         var_pvalues[i] = f_test(residuals_env, residuals_others)
-        assert(mean_pvalues[i] <= 1)
-        assert(var_pvalues[i] <= 1)
+        # assert mean_pvalues[i] <= 1, '{}'.format(mean_pvalues[i])
+        # assert var_pvalues[i] <= 1, '{}'.format(var_pvalues[i])
     # Combine via bonferroni correction
     pvalue_mean = min(mean_pvalues) * data.n_env
     pvalue_var = min(var_pvalues) * data.n_env

@@ -34,14 +34,15 @@
 # Commands to run the experiments on the same dataset as ABCD
 
 # First, generate the dataset
-python -m src.run_experiments --save_dataset dataset --G 100 --k 3 --p_min 12 --p_max 12 --w_min 0.5 --w_max 1 --var_min 0 --var_max 1 --int_min 0 --int_max 1 --random_state 0
-mv dataset_* dataset
+# python -m src.run_experiments --save_dataset dataset --G 10 --k 3 --p_min 12 --p_max 12 --w_min 0.5 --w_max 1 --var_min 0 --var_max 1 --int_min 0 --int_max 1 --random_state 0 --hidden 1
+# mv dataset_* dataset
 
 # It must be copied over to the ABCD repository to run ABCD on it; instructions can be found there.
 
 # Run A-ICP on the dataset
 # 3 jobs for the different initial sample sizes (50,100,100)
 
-python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 50 --abcd --tag abcd
-python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 100 --abcd --tag abcd
-python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 1000 --abcd --tag abcd
+# python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 50 --abcd --tag abcd
+# python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 100 --abcd --tag abcd
+# python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 1000 --abcd --tag abcd
+python -m src.run_experiments --n_workers -1 --G 100 --runs 1 --k 3 --runs 1 --p_min 12 --p_max 12 --w_min 0.5 --w_max 1 --var_min 0 --var_max 1 --int_min 0 --int_max 1 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 1000 --tag abcd --hidden 2
