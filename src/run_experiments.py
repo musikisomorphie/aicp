@@ -252,8 +252,9 @@ else:
     else:
         max_iter = args.max_iter
 
-    res_dir = Path(
-        '/mnt/sda1/Data/LGANM_hidden_{}'.format(args.hidden)) / args.tag
+    # res_dir = Path(
+        # '/home/histopath/Data/LGANM_time_{}'.format(args.hidden)) / args.tag
+    res_dir = Path('/home/histopath/Data/Symm') / args.tag
     print('n_obs', args.n_obs)
     if args.tag == 'abcd':
         pkl_tag = 'n_obs_{}'.format(args.n_obs)
@@ -295,8 +296,8 @@ else:
     # Save results
 
     # Compose filename
-    (res_dir / 'experiments').mkdir(parents=True, exist_ok=True)
-    filename = res_dir / 'experiments' / '{}.pickle'.format(pkl_tag)
-    # Pickle results
-    pickle.dump([cases] + results, open(str(filename), "wb"))
-    print('Save to file {}'.format(str(filename)))
+    # (res_dir / 'experiments').mkdir(parents=True, exist_ok=True)
+    # filename = res_dir / 'experiments' / '{}.pickle'.format(pkl_tag)
+    # # Pickle results
+    # pickle.dump([cases] + results, open(str(filename), "wb"))
+    # print('Save to file {}'.format(str(filename)))

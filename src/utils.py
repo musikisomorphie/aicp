@@ -39,6 +39,8 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import itertools
+import pickle
+import pathlib
 
 def matrix_block(M, rows, cols):
     """
@@ -299,3 +301,28 @@ def eg6():
                        [0,1,3]]
     return W, parents, markov_blankets
 
+def load_pkl(pkl_dir, obs, inv):
+    for pkl_id, pkl_file in enumerate(pkl_dir.glob('*.pickle')):
+        with open(str(pkl_file), 'rb') as pl:
+            lganm_dict = pickle.load(pl)
+            envs = lganm_dict['envs']
+            print(pkl_file, lganm_dict['target'], lganm_dict['truth'])
+            assert len(lganm_dict['truth']) * 10 + 1 == len(envs) 
+            for key, val in envs.items():
+                if key[0] == -1:
+                    assert val.shape[0] == obs
+                else:
+                    assert val.shape[0] == inv
+                # print(key, val.shape)
+            print()
+        # break
+
+
+def main():
+    # pkl_dir = pathlib.Path('/home/histopath/Data/Symm/abcd/n_obs_1000/')
+    # load_pkl(pkl_dir, 1000, 10)
+    pkl_dir = pathlib.Path('/home/histopath/Data/Symm/fin/n_1000/')
+    load_pkl(pkl_dir, 1000, 1000)
+
+if __name__ == '__main__':
+    main()

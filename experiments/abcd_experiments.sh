@@ -45,4 +45,4 @@
 # python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 50 --abcd --tag abcd
 # python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 100 --abcd --tag abcd
 # python -m src.run_experiments --load_dataset dataset --n_workers -1 --runs 4 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 1000 --abcd --tag abcd
-python -m src.run_experiments --n_workers -1 --G 100 --runs 1 --k 3 --runs 1 --p_min 12 --p_max 12 --w_min 0.5 --w_max 1 --var_min 0 --var_max 1 --int_min 0 --int_max 1 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 1000 --tag abcd --hidden 2
+python -m src.run_experiments --n_workers 1 --G 100 --runs 1 --k 3 --runs 1 --p_min 12 --p_max 12 --w_min 0.5 --w_max 1 --var_min 0 --var_max 1 --int_min 0 --int_max 1 --i_mean 7 --i_var 1 --max_iter 50 --alpha 0.002 --finite --n 10 --n_obs 1000 --tag abcd --hidden 0

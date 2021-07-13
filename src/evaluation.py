@@ -138,9 +138,9 @@ def evaluate_policies(cases, policies, policy_names, runs, params, n_workers=Non
             batch = experiments[i*batch_size:(i+1)*batch_size]
         batch_start = time.time()
         if n_workers > 1:
-            result += pool.map(run_policy, batch)
+            result += pool.map(run_policy_symm, batch)
         else:
-            result += list(map(run_policy, batch))
+            result += list(map(run_policy_symm, batch))
         batch_end = time.time()
         print("  %d/%d experiments completed (%0.2f seconds)" %
               ((i+1)*batch_size, n_exp, batch_end-batch_start))
@@ -185,8 +185,8 @@ def run_policy(settings):
 
     # Remaining iterations
     for i in range(settings.max_iter):
-        print(i)
-    # for i in range(8):
+        # print(i)
+        # for i in range(8):
         assert next_intervention != case.target
         # Build interventions: targets, parameters and type
         if next_intervention is None:
@@ -377,3 +377,58 @@ class Environments():
             if env != []:
                 envs.append(env)
         return envs
+
+
+def run_policy_symm(settings):
+    """Execute a policy over a given test case, returning a returning a
+    PolicyEvaluationResults object containing the result"""
+
+    print(vars(settings))
+    i_mean = settings.intervention_mean
+    i_var = settings.intervention_var
+
+    # Initialization
+    case = settings.case
+    if settings.random_state is not None:
+        np.random.seed(settings.random_state)
+    e = case.sem.sample(n=settings.n_obs)
+    envs = Symm_Env((-1, i_mean, i_var, 1), e)
+
+    print(case.truth, case.target)
+    for par in case.truth:
+        for i in range(10):
+            coef = i / 10.
+            print(par, coef)
+            symm_inv = {'symm_interventions': (par, i_mean, i_var, coef)}
+            new_env = case.sem.sample(n=settings.n_int, **symm_inv)
+            envs.add((par, i_mean, i_var, coef), new_env)
+
+    if settings.pkl_dir is not None:
+        pkl_dict = vars(settings).copy()
+        pkl_dict['envs'] = envs.to_dict()
+        pkl_dict['target'] = case.target
+        pkl_dict['truth'] = case.truth
+        pkl_nm = settings.pkl_dir / '{}.pickle'.format(settings.random_state)
+        with open(str(pkl_nm), 'wb') as pl:
+            pickle.dump(pkl_dict, pl)
+    return EvaluationResult('symm', case.truth, [], [])
+
+
+class Symm_Env():
+    """Class to hold samples from different environments, merging if they
+    arise from the same intervention to improve efficiency"""
+
+    def __init__(self, env_key, env_val):
+        self.envs = dict()
+        self.envs[env_key] = env_val
+
+    def add(self, env_key, env_val):
+        # Merge samples that arise from
+        # same interventional environment
+        if env_key not in self.envs:
+            self.envs[env_key] = env_val
+        else:
+            self.envs[env_key] = np.vstack([env_val, self.envs[env_key]])
+
+    def to_dict(self):
+        return self.envs

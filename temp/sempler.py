@@ -33,7 +33,7 @@ from copy import deepcopy
 from sempler import utils, functions
 from sempler.utils import matrix_block
 
-#---------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # ANM class
 
 
@@ -87,7 +87,7 @@ class ANM:
         return X
 
 
-#---------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # LGANM class
 class LGANM:
     """Represents a linear model with Gaussian additive noise
@@ -141,7 +141,7 @@ class LGANM:
         else:
             self.means = means.copy()
 
-    def sample(self, n=100, population=False, do_interventions=None, shift_interventions=None):
+    def sample(self, n=100, population=False, do_interventions=None, shift_interventions=None, symm_intervension=None):
         """
         If population is set to False:
           - Generate n samples from a given Linear Gaussian SCM, under the given
@@ -172,6 +172,20 @@ class LGANM:
             variances[targets] = do_interventions[:, 2]
             W[:, targets] = 0
 
+        if symm_intervension is not None:
+            # the tranform parameter symm_l
+            # need to learned
+            # if symm_l = 1, observational
+            # if symm_l = 0, do_intervention
+            symm_l = symm_interventions[:, 3]
+            symm_interventions = parse_interventions(symm_interventions)
+            targets = symm_interventions[:, 0].astype(int)
+            means[targets] = symm_l * means[targets] + \
+                (1 - symm_l) * symm_interventions[:, 1]
+            variances[targets] = (symm_l ** 2) * variances[targets] + \
+                                 ((1 - symm_l) ** 2) * symm_interventions[:, 2]
+            W[:, targets] *= symm_l
+
         # Sampling by building the joint distribution
         A = np.linalg.inv(np.eye(self.p_new) - W.T)
         mean = A @ means
@@ -197,7 +211,7 @@ def parse_interventions(interventions_dict):
             raise ValueError("Wrongly specified intervention")
     return np.array(interventions)
 
-#---------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # DAG Generating Functions
 
 
@@ -236,14 +250,14 @@ def dag_full(p, w_min=1, w_max=1, debug=False):
     W = A * weights
     return W
 
-#---------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # NormalDistribution class
 
 
 class NormalDistribution():
     """Symbolic representation of a normal distribution that allows for
     marginalization, conditioning and sampling
-    
+
     Attributes:
       - mean: mean vector
       - covariance: covariance matrix
